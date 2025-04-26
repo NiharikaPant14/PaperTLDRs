@@ -1,0 +1,51 @@
+name: Sync TLDRs Folders from All Repositories
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs every day at midnight
+  push:
+    branches:
+      - main  # Triggers when there's a push to the main branch
+  workflow_dispatch:  # Allows manual triggering via GitHub UI
+
+jobs:
+  sync_tldr_files:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout sync repository
+      - name: Checkout sync repository
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Git environment for committing
+      - name: Set up Git
+        run: |
+          git config --global user.name "Niharika Pant"
+          git config --global user.email "niharikapant2002@outlook.com"
+
+      # Step 3: Fetch the list of repositories
+      - name: Get list of repositories
+        id: repos
+        run: |
+          curl -s "https://api.github.com/users/NiharikaPant14/repos?per_page=100" | \
+          jq -r '.[].name' > repos.txt
+
+      # Step 4: Sync TLDRs folders from each repository
+      - name: Sync from repositories
+        run: |
+          mkdir -p TLDRs  # Create TLDRs folder if it doesn't exist
+          while read repo; do
+            echo "Syncing from ${repo}"
+            git clone https://github.com/NiharikaPant14/$repo.git
+            if [ -d "$repo/TLDRs" ]; then
+              cp -r $repo/TLDRs/* ./TLDRs/  # Copy contents of the TLDRs folder into sync repo
+            fi
+            rm -rf $repo  # Clean up the cloned repository
+          done < repos.txt
+
+      # Step 5: Commit and push the changes to sync repo
+      - name: Commit and push changes to sync repo
+        run: |
+          git add .
+          git commit -m "Sync TLDR files from all repositories"
+          git push origin main
